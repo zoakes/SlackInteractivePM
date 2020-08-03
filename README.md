@@ -24,3 +24,6 @@ Query the log from SlackUI, to pull metrics and reports on trade data -- Ex PNL 
 
 ## ELD Snippets:
 Found in .ELD files or .TXT files
+ELDMonitor needs to run in 1 location, on one chart for ex.
+
+Then the Snippet at bottom -- for reading globals -- needs to be included in all strategies to be controlled by SlackInteractivePM
