@@ -1,0 +1,229 @@
+//Author -- ZOakes
+
+{Master program, only need to run in one chart -- commands all globals for each symbol...}
+//IN OTHER STRATEGY OR INDICATOR --- READ the global s!!
+
+
+// ---------- READ IN THE RECENT COMMANDS --------- //
+inputs:
+use_globals(0),
+loop_on(0);
+
+
+vars:
+list_ID(0), //list of lists id..?
+list_cmd(0),
+list_sym(0),
+list_cid(0),
+list_tm(0),
+cid(0),
+cmd(""),
+sym(""),
+tm(0);
+
+
+// ----------  Read in the Matrix.... ---------- //
+
+// MAYBE a good idea to do ...
+
+
+		{if LastBarOnChart and barstatus(1)=2 then
+
+		begin
+		}
+
+
+
+// to RUN ONCE --- if currentbar = 1 then begin
+list_id = listc.New;
+
+//path = "C:\Users\Zach Oakes\Documents\eld_read.txt"
+
+value1 = listc.ReadFile(list_id, "C:\Users\Zach Oakes\Documents\eld_read.txt");
+
+//Columns -- List of Lists ? (of cids, cmds, syms, and tms)
+
+list_cid = ListC.Get(list_id,1);
+list_cmd = ListC.Get(list_id,2);
+list_sym = ListC.Get(list_id,3);
+list_tm = ListC.Get(list_id,4);
+
+
+{
+value (1 Row) -- Get( Column_List, idx/ROW )
+Really these are VALUES of lists of strings / etc -- Each Row
+ cid = ListS.Get(list_cid, 1); // 1st row, of CID list (column)
+ value = ListS.Get(Column, Row);
+}
+
+// ------ 1ST ROW ------ //
+//Lets get the first row...
+cid = ListN.get(list_cid, 1);
+cmd = ListS.Get(list_cmd, 1);
+sym = ListS.Get(list_sym,1);
+tm = ListN.Get(list_tm, 1);
+
+//print("Row:");
+//print(cid,cmd, sym, tm);
+
+//Make GLOBAL dict ... WRITE GLOBALS 
+
+vars:
+sym_id(0),
+haltAll(0),
+halt(0),
+pause(0),
+go_flat(0);
+
+
+// Loop Through Rows of CSV (More accurately, loop through column lists one row at a time !! 
+vars:
+last_CID(0),
+recordNum(0);
+
+// -------------------------------- POSSIBLY EASIER TO SIMPLY NUMBER THEM ALPABETICALLY?
+
+if lastbaronchart then begin  // THIS MUST FUCKING BE HERE -- otherwise STARTS OVER at IDX == 4!!
+
+if loop_on > 0 then begin 
+
+while cmd <> "EOF" and cid <> -1 //recordNum < 5 //
+begin 
+	print("Record -- ", recordNum);
+
+	//Start at IDX = 1 !!
+	recordNum = recordNum + 1;
+	
+	//if recordNum = 4 then begin 
+	//	print("Breaking");
+	//	break;
+	//end;
+	//End Here!
+	
+	
+	//Get CID to check if NEW value... (Find Beginning of new stuff)
+	
+	
+	cid = ListN.Get(list_cid, recordNum);
+	cmd = ListS.Get(list_cmd, recordNum);
+	
+	//Check is EOF (-1 CID) -- if so, End here!
+	if cid = -1 then begin 
+		//print("CID",cid);
+		print("Breaking...");
+		break;
+	end;
+	
+	//check for NEW values / Rows...
+	
+	if cid <= last_CID then
+	begin 
+		//Skip until NEW values...
+		continue;
+	end;
+	
+	
+	//check for EOF ... (Find end of new stuff)
+	
+	//cmd = ListS.Get(list_cmd,recordNum);
+	if cmd = "EOF" then 
+	begin 
+		last_CID = cid; //To Not Repeat !!
+		break;
+	end;
+	
+	//cid = ListN.Get(list_CID, recordNum);
+	//cmd = ... 
+							//DEFINE EACH ROW...
+	sym = ListS.Get(list_sym, recordNum);
+	tm = ListN.Get(list_tm, recordNum);
+	print(recordNum, "--",cid, cmd, sym, tm);
+	
+										//Might need to set these as defaults here!! Otherwise will throw errors checking for ALL in strategies.
+	
+	//SET GLOBALS DEPENDING ON WHICH COMMAND TO BE EXECUTED / FLAGGED FOR EXECUTION 
+	switch(cmd) 
+	begin 
+		//Flatten
+		case "F":
+			if use_globals > 0 then go_flat = GVSetNamedBool("Go_Flat_" + sym,True); //Throwing Error !! 
+			print("Going Flat");
+		
+		//Halt
+		case "H":
+			if use_globals > 0 then halt = GVSetNamedBool("Halt_" + sym, True);
+			print("Halting...");
+			if sym = "ALL" then 
+			begin 
+				if use_globals > 0 then haltAll = GVSetNamedBool("HaltAll", True);
+			end;
+			
+		//Pause -- Set Global to Time (in hours) to Pause (tm) 
+		case "P":
+			if use_globals > 0 then pause = GVSetNamedDouble("Pause_" + sym, tm);
+			print("Pausing...");
+			
+			
+		default:
+			print("Error -- Please Check CSV / TXT -- only 3 options!");
+	
+	end;
+	
+	
+
+end;
+
+
+end;
+
+end;
+
+vars:
+getHA(false);
+
+haltAll = GVSetBoolean(1,True);
+
+getHA = GVGetBoolean(1);
+print("Get",getHA);
+{
+
+// ---------- Logic to READ GLOBALS
+
+var:
+global_dict(mapSN.new),
+global_values(listn.new);
+
+listn.pushback(global_values,halt);
+listn.pushback(global_values,pause);
+listn.pushback(global_values,go_flat);
+
+mapsn.put(sym_id,symbolname,global_values);
+
+
+//Logic to READ the globals (in STrategy)...
+vars:
+sys_go_flat(false),
+sys_halt(0),
+start_time(0),
+pause_time(0);
+
+pause_time = GVGetNamedDouble("Pause_"+symbolname,0); //In hundreds...
+sys_halt = GVGetNamedDouble("HALT",0);
+sys_go_flat = GVGetNamedbool("Go_Flat_"+symbolname);
+
+if pause_time <> 0 then start_time = time + pause_time; ///Make sure only read / set once...
+
+if time > start_time then begin 
+if sys_halt = 0 then begin 
+//Trading logic... 
+
+end;
+end;
+
+if sys_go_flat then begin 
+//sell("Auto LX") this bar at close;
+//buytocover("Auto SX") this bar at close;
+end;
+
+}
+
